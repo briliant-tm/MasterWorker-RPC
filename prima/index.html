@@ -1,0 +1,46 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Master–Worker Bilangan Prima</title>
+<style>
+:root{--bg:#f6f7f9;--fg:#1b1f24;--card:#fff;--ac:#2563eb;--mu:#6b7280;--bd:#e5e7eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1318;--fg:#e6e8eb;--card:#181d24;--ac:#60a5fa;--mu:#9aa3af;--bd:#2a313b}}
+body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+main{max-width:860px;margin:auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin:12px 0}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.grid .card{margin:0}
+label{display:block;font-size:13px;color:var(--mu)}
+input,button{font:inherit;padding:8px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--fg);width:100%;box-sizing:border-box}
+button{background:var(--ac);color:#fff;border:0;cursor:pointer}
+.bar{height:10px;background:var(--bd);border-radius:5px;overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--ac);width:0;transition:width .3s}
+.t{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:6px;text-align:left;border-bottom:1px solid var(--bd)}
+.ok{color:#16a34a}.no{color:#dc2626}.mu{color:var(--mu)}
+</style></head><body><main>
+<h2>Pencacah Bilangan Prima Terdistribusi</h2>
+<p class="mu">Master membagi rentang ke banyak tugas, lalu memanggil worker via gRPC secara paralel.</p>
+<h3>Worker</h3><div id="w" class="grid"></div>
+<div class="card"><div class="grid">
+<div><label>Mulai</label><input id="a" type="number" value="1"></div>
+<div><label>Akhir (maks 10.000.000)</label><input id="b" type="number" value="2000000"></div>
+<div><label>Jumlah worker</label><input id="n" type="number" value="3" min="1"></div>
+<div><label>Jumlah tugas</label><input id="t" type="number" value="60" min="1"></div></div><br>
+<div class="grid"><button onclick="mulai()">Mulai hitung</button><button onclick="sp()">Uji speedup (1..N worker)</button></div>
+<div class="bar"><i id="bar"></i></div><div id="info" class="mu">Belum ada job.</div>
+<div class="t"><table><thead><tr><th>Worker</th><th>Tugas selesai</th><th>Status</th></tr></thead><tbody id="pw"></tbody></table></div></div>
+<div class="card"><b>Hasil uji speedup</b><div class="t"><table><thead><tr><th>Worker</th><th>Waktu (s)</th><th>Speedup</th><th>Efisiensi</th></tr></thead><tbody id="sp"></tbody></table></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const j=(u,b)=>fetch(u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{}).then(r=>r.json());
+const f=n=>Number(n).toLocaleString('id-ID');
+async function workers(){const w=await j('/api/workers');
+ $('w').innerHTML=w.map(x=>`<div class="card"><b>${x.alamat}</b><br>${x.hidup?`<span class="ok">● aktif</span> · ${x.cpu} CPU<br><span class="mu">${x.selesai} tugas selesai</span>`:'<span class="no">● tidak aktif</span>'}</div>`).join('')}
+let jid,tm;
+async function mulai(){const r=await j('/api/jobs',{mulai:+$('a').value,akhir:+$('b').value,worker:+$('n').value,tugas:+$('t').value});
+ if(r.error){alert(r.error);return}jid=r.id;clearInterval(tm);tm=setInterval(poll,600)}
+async function poll(){const s=await j('/api/jobs/'+jid);$('bar').style.width=(s.selesai/s.total_tugas*100)+'%';
+ $('info').innerHTML=`Status: <b>${s.status}</b> · ${s.selesai}/${s.total_tugas} tugas · prima: <b>${f(s.prima)}</b> · terbesar: ${f(s.terbesar)} · ${s.waktu.toFixed(2)} s · retry: ${s.retry}`;
+ $('pw').innerHTML=Object.entries(s.worker).map(([a,w])=>`<tr><td>${a}</td><td>${w.tugas}</td><td>${w.hidup?'aktif':'<span class="no">mati (tugas dialihkan)</span>'}</td></tr>`).join('');
+ if(s.status!='berjalan')clearInterval(tm)}
+async function sp(){const r=await j('/api/speedup',{mulai:+$('a').value,akhir:+$('b').value});if(r.error)alert(r.error)}
+async function bench(){const r=await j('/api/speedup');
+ $('sp').innerHTML=r.hasil.map(x=>`<tr><td>${x.worker}</td><td>${x.waktu}</td><td>${x.speedup}x</td><td>${x.efisiensi}%</td></tr>`).join('')+(r.berjalan?'<tr><td colspan="4" class="mu">Mengukur…</td></tr>':'')}
+workers();bench();setInterval(workers,3000);setInterval(bench,1500);
+</script></main></body></html>

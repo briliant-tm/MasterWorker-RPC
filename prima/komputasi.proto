@@ -1,0 +1,19 @@
+syntax = "proto3";
+package komputasi;
+
+service Worker {
+  rpc Ping (Kosong) returns (InfoWorker);                 // unary: cek kesehatan
+  rpc Info (Kosong) returns (StatusWorker);               // unary: statistik worker
+  rpc HitungPrima (Tugas) returns (stream Progres);       // server streaming: progres + hasil
+  rpc Batal (BatalRequest) returns (Balasan);             // unary: batalkan tugas
+}
+message Kosong {}
+message InfoWorker { string worker_id = 1; int32 cpu = 2; }
+message StatusWorker { int32 selesai = 1; int32 sedang_jalan = 2; int64 total_bilangan = 3; }
+message Tugas { string request_id = 1; int64 mulai = 2; int64 akhir = 3; }  // [mulai, akhir)
+message Progres {
+  double persen = 1; bool selesai = 2; int64 jumlah_prima = 3;
+  int64 prima_terbesar = 4; double durasi = 5; string worker_id = 6;
+}
+message BatalRequest { string request_id = 1; }
+message Balasan { bool sukses = 1; string pesan = 2; }
