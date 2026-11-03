@@ -1,0 +1,21 @@
+services:
+  worker1:
+    build: .
+    command: python -m worker.worker_server --id worker-1 --port 50052
+  worker2:
+    build: .
+    command: python -m worker.worker_server --id worker-2 --port 50053
+  worker3:
+    build: .
+    command: python -m worker.worker_server --id worker-3 --port 50054
+  master:
+    build: .
+    command: python -m master.master_server
+    environment:
+      WORKERS: worker1:50052,worker2:50053,worker3:50054
+    ports:
+      - "50051:50051"
+    depends_on:
+      - worker1
+      - worker2
+      - worker3
